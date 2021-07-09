@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { ChildProcess } from 'child_process';
+import { ChildProcess, fork } from 'child_process';
 import { pausePromise } from '@cubejs-backend/shared';
 
 import { CubeStoreHandler } from './process';
@@ -10,14 +10,16 @@ class CubeStoreHandlerOpen extends CubeStoreHandler {
 }
 
 describe('CubeStoreHandler', () => {
-  it('acquire with release', async () => {
-    jest.setTimeout(60 * 1000);
-
+  beforeAll(() => {
     try {
       fs.unlinkSync(getBinaryPath());
     } catch (e) {
       console.log(e);
     }
+  });
+
+  it('acquire with release', async () => {
+    jest.setTimeout(60 * 1000);
 
     const handler = new CubeStoreHandlerOpen({
       stdout: (v) => {
@@ -41,12 +43,6 @@ describe('CubeStoreHandler', () => {
 
   it('auto restart', async () => {
     jest.setTimeout(60 * 1000);
-
-    try {
-      fs.unlinkSync(getBinaryPath());
-    } catch (e) {
-      console.log(e);
-    }
 
     let restartCount = 0;
 
@@ -82,5 +78,33 @@ describe('CubeStoreHandler', () => {
     }
 
     await handler.release(true);
+  });
+
+  it('auto kill if parent dies', async () => {
+    jest.setTimeout(60 * 1000);
+
+    const startedProcess = fork('./dist/process-test-fork', {
+      stdio: 'pipe'
+    });
+    startedProcess.stdout.on('data', (std) => {
+      console.log(std.toString());
+    });
+    startedProcess.stderr.on('data', (std) => {
+      console.log(std.toString());
+    });
+
+    const exitPromise = new Promise<void>((resolve) => {
+      startedProcess.on('exit', () => {
+        resolve();
+      });
+    });
+
+    await pausePromise(5 * 1000);
+
+    startedProcess.kill();
+
+    await exitPromise;
+
+    await pausePromise(2 * 1000);
   });
 });
