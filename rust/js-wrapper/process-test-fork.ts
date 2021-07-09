@@ -1,5 +1,3 @@
-import fs from 'fs';
-import { getBinaryPath } from './download';
 import { CubeStoreHandler } from './process';
 
 (async () => {
